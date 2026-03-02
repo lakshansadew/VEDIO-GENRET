@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lakiya AI - Cinematic Video Generation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-glow: rgba(99, 102, 241, 0.5);
+            --secondary-glow: rgba(168, 85, 247, 0.3);
+            --accent-cyan: rgba(34, 211, 238, 0.6);
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #000000;
+            overflow-x: hidden;
+        }
+        
+        .font-display {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        
+        /* Animated Background Canvas */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.6;
+        }
+        
+        /* Glassmorphism Utilities */
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        
+        .glass-strong {
+            background: rgba(20, 20, 25, 0.7);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        
+        .glass-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+        
+        /* Gradient Text */
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .gradient-text-cyan {
+            background: linear-gradient(135deg, #22d3ee 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Glow Effects */
+        .glow-button {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .glow-button::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #6366f1, #a855f7, #22d3ee, #6366f1);
+            background-size: 400%;
+            z-index: -1;
+            animation: glow 20s linear infinite;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .glow-button:hover::before {
+            opacity: 1;
+        }
+        
+        @keyframes glow {
+            0% { background-position: 0 0; }
+            50% { background-position: 400% 0; }
+            100% { background-position: 0 0; }
+        }
+        
+        /* Progress Animation */
+        .progress-ring {
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s;
+            transform-origin: 50% 50%;
+        }
+        
+        /* Typing Cursor */
+        .typing-cursor::after {
+            content: '|';
+            animation: blink 1s infinite;
+            color: #22d3ee;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        /* Particle Animation */
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(99, 102, 241, 0.6);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 10s infinite ease-in-out;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
+        }
+        
+        /* Scene Cards */
+        .scene-card {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: slideIn 0.5s forwards;
+        }
+        
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.3);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.8);
+        }
+        
+        /* Neural Network Animation */
+        .neural-line {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: drawLine 2s forwards;
+        }
+        
+        @keyframes drawLine {
+            to { stroke-dashoffset: 0; }
+        }
+        
+        /* Sinhala Font Support */
+        .sinhala-text {
+            font-family: 'Noto Sans Sinhala', 'Inter', sans-serif;
+        }
+        
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #6366f1;
+        }
+        
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #6366f1;
+        }
+        
+        /* Pulse Animation */
+        .pulse-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid rgba(99, 102, 241, 0.5);
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0; }
+        }
+        
+        /* Video Player Simulation */
+        .video-frame {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .video-frame::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="none" stroke="rgba(99,102,241,0.1)" stroke-width="0.5"/></svg>');
+            background-size: 20px 20px;
+            opacity: 0.3;
+        }
+        
+        /* Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="text-white antialiased">
+
+    <!-- Animated Background -->
+    <canvas id="bg-canvas"></canvas>
+    
+    <!-- Floating Particles Container -->
+    <div id="particles" class="fixed inset-0 pointer-events-none z-0"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 glass-strong border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white font-display text-lg">L</div>
+                    <span class="font-display text-xl font-bold tracking-tight">Lakiya<span class="gradient-text"> AI</span></span>
+                </div>
+                
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="#features" class="text-sm text-gray-300 hover:text-white transition-colors">Features</a>
+                    <a href="#how-it-works" class="text-sm text-gray-300 hover:text-white transition-colors">How it Works</a>
+                    <a href="#pricing" class="text-sm text-gray-300 hover:text-white transition-colors">Pricing</a>
+                    <div class="flex items-center gap-2 px-3 py-1 rounded-full glass text-xs">
+                        <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                        <span class="text-gray-300">System Online</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleLanguage()" class="flex items-center gap-2 px-4 py-2 rounded-lg glass hover:bg-white/5 transition-all text-sm">
+                        <span id="lang-indicator">🇺🇸 EN</span>
+                    </button>
+                    <button class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all text-sm font-medium border border-white/20">
+                        Sign In
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        
+        <!-- Hero Section -->
+        <div class="text-center mb-16 relative">
+            <div class="absolute inset-0 -z-10">
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px]"></div>
+            </div>
+            
+            <h1 class="font-display text-5xl md:text-7xl font-bold mb-6 leading-tight">
+                <span class="block text-gray-400 text-2xl md:text-3xl font-normal mb-2 tracking-widest uppercase">Cinematic AI Video Generation</span>
+                <span id="hero-title" class="gradient-text typing-cursor">Create Magic with Words</span>
+            </h1>
+            
+            <p class="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto mb-8 leading-relaxed" id="hero-subtitle">
+                Transform simple prompts into 10-minute HD cinematic videos. AI-powered script expansion, automatic scene generation, and natural Sinhala voiceovers.
+            </p>
+
+            <!-- Language Badge -->
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8">
+                <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 bg-cyan-400 rounded-full"></span>
+                    <span class="text-sm text-cyan-400 font-medium">සිංහල</span>
+                </span>
+                <span class="text-gray-500">|</span>
+                <span class="text-sm text-gray-300">Natural Voice Support</span>
+            </div>
+        </div>
+
+        <!-- Main Input Interface -->
+        <div class="max-w-3xl mx-auto mb-16 relative">
+            <div class="glass-strong rounded-2xl p-1 shadow-2xl shadow-indigo-500/20">
+                <div class="bg-black/40 rounded-xl p-6 md:p-8">
+                    <div class="relative">
+                        <textarea 
+                            id="prompt-input" 
+                            class="w-full bg-transparent text-white text-lg md:text-xl placeholder-gray-600 border-none resize-none focus:outline-none focus:ring-0 min-h-[120px] font-light leading-relaxed"
+                            placeholder="Describe your video idea... (e.g., 'A serene meditation journey through ancient Sri Lankan temples at sunrise')"
+                        ></textarea>
+                        
+                        <!-- AI Enhancement Indicator -->
+                        <div id="ai-enhance-badge" class="absolute bottom-4 right-4 hidden items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-xs text-indigo-300">
+                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>AI Enhancing Prompt...</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick Settings Bar -->
+                    <div class="flex flex-wrap items-center justify-between gap-4 mt-6 pt-6 border-t border-white/10">
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <!-- Duration -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500 uppercase tracking-wider">Duration</span>
+                                <select id="duration-select" class="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                    <option value="1">1 min</option>
+                                    <option value="3">3 min</option>
+                                    <option value="5" selected>5 min</option>
+                                    <option value="10">10 min</option>
+                                </select>
+                            </div>
+
+                            <!-- Resolution -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500 uppercase tracking-wider">Quality</span>
+                                <select id="quality-select" class="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                    <option value="720">720p</option>
+                                    <option value="1080" selected>1080p HD</option>
+                                    <option value="4k">4K</option>
+                                </select>
+                            </div>
+
+                            <!-- Voice -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500 uppercase tracking-wider">Voice</span>
+                                <select id="voice-select" class="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                                    <option value="auto">Auto Detect</option>
+                                    <option value="sinhala-female">සිංහල - Female</option>
+                                    <option value="sinhala-male">සිංහල - Male</option>
+                                    <option value="english-female">English - Female</option>
+                                    <option value="english-male">English - Male</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button onclick="clearPrompt()" class="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all" title="Clear">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <div class="p-4 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 rounded-b-xl">
+                    <button onclick="generateVideo()" id="generate-btn" class="w-full glow-button bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold py-4 px-8 rounded-xl text-lg shadow-lg shadow-indigo-500/25 transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        <span>Generate Magic</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Enhanced Prompt Preview -->
+            <div id="enhanced-preview" class="hidden mt-6 glass rounded-xl p-6 border-l-4 border-indigo-500">
+                <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <span class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">AI Enhanced Cinematic Script</span>
+                </div>
+                <p id="enhanced-text" class="text-gray-300 text-sm leading-relaxed italic"></p>
+            </div>
+        </div>
+
+        <!-- Generation Progress Section (Hidden by default) -->
+        <div id="generation-section" class="hidden max-w-4xl mx-auto mb-16">
+            <div class="glass-strong rounded-2xl p-8 relative overflow-hidden">
+                <!-- Progress Header -->
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h3 class="text-2xl font-display font-bold mb-1">Generating Your Cinematic Experience</h3>
+                        <p class="text-gray-400 text-sm">AI is crafting scenes, synthesizing audio, and rendering video</p>
+                    </div>
+                    <div class="relative w-16 h-16">
+                        <svg class="progress-ring w-16 h-16" viewBox="0 0 100 100">
+                            <circle class="text-gray-700" stroke-width="8" stroke="currentColor" fill="transparent" r="42" cx="50" cy="50"/>
+                            <circle id="progress-circle" class="progress-ring-circle text-indigo-500" stroke-width="8" stroke-linecap="round" stroke="currentColor" fill="transparent" r="42" cx="50" cy="50" stroke-dasharray="264" stroke-dashoffset="264"/>
+                        </svg>
+                        <span id="progress-text" class="absolute inset-0 flex items-center justify-center text-sm font-bold">0%</span>
+                    </div>
+                </div>
+
+                <!-- Generation Steps -->
+                <div class="space-y-4" id="generation-steps">
+                    <div class="step-item flex items-center gap-4 p-4 rounded-lg bg-white/5 border border-white/5 opacity-50" data-step="1">
+                        <div class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                            <span class="text-xs font-bold">1</span>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-medium text-sm">Script Expansion & Analysis</h4>
+                            <p class="text-xs text-gray-500">Enhancing prompt with cinematic details</p>
+                        </div>
+                        <div class="step-status w-2 h-2 rounded-full bg-gray-600"></div>
+                    </div>
+
+                    <div class="step-item flex items-center gap-4 p-4 rounded-lg bg-white/5 border border-white/5 opacity-50" data-step="2">
+                        <div class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                            <span class="text-xs font-bold">2</span>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-medium text-sm">Scene Generation & Storyboarding</h4>
+                            <p class="text-xs text-gray-500">Creating visual sequences with AI cinematography</p>
+                        </div>
+                        <div class="step-status w-2 h-2 rounded-full bg-gray-600"></div>
+                    </div>
+
+                    <div class="step-item flex items-center gap-4 p-4 rounded-lg bg-white/5 border border-white/5 opacity-50" data-step="3">
+                        <div class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                            <span class="text-xs font-bold">3</span>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-medium text-sm">Voice Synthesis & Audio Design</h4>
+                            <p class="text-xs text-gray-500">Natural Sinhala TTS with emotional matching</p>
+                        </div>
+                        <div class="step-status w-2 h-2 rounded-full bg-gray-600"></div>
+                    </div>
+
+                    <div class="step-item flex items-center gap-4 p-4 rounded-lg bg-white/5 border border-white/5 opacity-50" data-step="4">
+                        <div class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                            <span class="text-xs font-bold">4</span>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-medium text-sm">Video Composition & Rendering</h4>
+                            <p class="text-xs text-gray-500">Final assembly with transitions and effects</p>
+                        </div>
+                        <div class="step-status w-2 h-2 rounded-full bg-gray-600"></div>
+                    </div>
+                </div>
+
+                <!-- Scene Preview Grid -->
+                <div id="scene-preview" class="hidden mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Scenes will be generated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Player Section (Hidden by default) -->
+        <div id="video-section" class="hidden max-w-5xl mx-auto mb-16">
+            <div class="glass-strong rounded-2xl overflow-hidden shadow-2xl shadow-indigo-500/20">
+                <!-- Video Header -->
+                <div class="flex items-center justify-between p-4 border-b border-white/10 bg-white/5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span class="ml-4 text-sm text-gray-400 font-mono">lakiya_generated_cinematic.mp4</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-500 px-2 py-1 rounded bg-white/5">1080p</span>
+                        <span class="text-xs text-gray-500 px-2 py-1 rounded bg-white/5">5:00</span>
+                    </div>
+                </div>
+
+                <!-- Video Player -->
+                <div class="video-frame aspect-video relative group">
+                    <div id="video-content" class="absolute inset-0 flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform cursor-pointer" onclick="playVideo()">
+                                <svg class="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                            <p class="text-gray-400 text-sm">Click to Preview</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Simulated Video Overlay -->
+                    <div id="video-overlay" class="absolute inset-0 bg-gradient-to-br from-indigo-900/50 to-purple-900/50 opacity-0 pointer-events-none transition-opacity">
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center">
+                                <div class="text-6xl mb-4">🎬</div>
+                                <h3 class="text-2xl font-bold mb-2">Cinematic Preview</h3>
+                                <p class="text-gray-300">Scene transitions active</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subtitle Preview -->
+                    <div class="absolute bottom-16 left-0 right-0 text-center px-4">
+                        <p id="subtitle-preview" class="text-white text-lg font-medium drop-shadow-lg bg-black/40 inline-block px-4 py-2 rounded-lg backdrop-blur-sm sinhala-text hidden">
+                            සිංහල උපසිරසි මෙහි දිස් වේ
+                        </p>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                        <div class="flex items-center gap-4">
+                            <button onclick="playVideo()" class="text-white hover:text-indigo-400 transition-colors">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></button>
+                            </button>
+                            <div class="flex-1 h-1 bg-white/20 rounded-full overflow-hidden cursor-pointer">
+                                <div id="progress-bar" class="h-full bg-indigo-500 w-0 transition-all duration-300"></div>
+                            </div>
+                            <span class="text-xs text-gray-400 font-mono">00:00 / 05:00</span>
+                            <button class="text-white hover:text-indigo-400 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Export Options -->
+                <div class="p-6 bg-white/5 border-t border-white/10">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-4">
+                            <h4 class="font-semibold text-sm">Export Options:</h4>
+                            <div class="flex gap-2">
+                                <button onclick="exportVideo('mp4')" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-all flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    Download MP4
+                                </button>
+                                <button onclick="exportVideo('social')" class="px-4 py-2 rounded-lg glass hover:bg-white/10 text-white text-sm font-medium transition-all flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                                    Social Format
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 text-sm text-gray-400">
+                            <span>Subtitles:</span>
+                            <button onclick="toggleSubtitles()" id="sub-btn" class="px-3 py-1 rounded bg-green-500/20 text-green-400 border border-green-500/30 text-xs">ON</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Grid -->
+        <div id="features" class="grid md:grid-cols-3 gap-6 mb-16">
+            <div class="glass-card rounded-xl p-6 border border-white/5">
+                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-4">
+                    <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </div>
+                <h3 class="font-display font-bold text-lg mb-2">Smart Script Expansion</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">1-2 sentence prompts automatically expand into full cinematic scripts with detailed scene descriptions.</p>
+            </div>
+
+            <div class="glass-card rounded-xl p-6 border border-white/5">
+                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center mb-4">
+                    <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                </div>
+                <h3 class="font-display font-bold text-lg mb-2">Natural Sinhala Voice</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">AI-generated natural Sinhala speech with male and female voice options, emotion matching, and perfect lip-sync.</p>
+            </div>
+
+            <div class="glass-card rounded-xl p-6 border border-white/5">
+                <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-4">
+                    <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>
+                </div>
+                <h3 class="font-display font-bold text-lg mb-2">Cinematic Auto-Production</h3>
+                <p class="text-gray-400 text-sm leading-relaxed">Automatic camera angles, scene transitions, background music, and sound effects synchronized to emotional tone.</p>
+            </div>
+        </div>
+
+        <!-- Technical Specs -->
+        <div class="glass rounded-xl p-6 mb-16 border border-white/5">
+            <h3 class="font-display font-bold text-lg mb-6 flex items-center gap-2">
+                <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+                Technical Specifications
+            </h3>
+            <div class="grid md:grid-cols-4 gap-4 text-sm">
+                <div class="bg-white/5 rounded-lg p-4">
+                    <span class="text-gray-500 block text-xs mb-1">Max Duration</span>
+                    <span class="text-white font-semibold">10 Minutes</span>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <span class="text-gray-500 block text-xs mb-1">Resolution</span>
+                    <span class="text-white font-semibold">Up to 4K UHD</span>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <span class="text-gray-500 block text-xs mb-1">Audio</span>
+                    <span class="text-white font-semibold">48kHz Stereo</span>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <span class="text-gray-500 block text-xs mb-1">Languages</span>
+                    <span class="text-white font-semibold">Sinhala + 50+</span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/10 bg-black/50 backdrop-blur-xl mt-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div class="col-span-2">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white font-display">L</div>
+                        <span class="font-display text-xl font-bold">Lakiya AI</span>
+                    </div>
+                    <p class="text-gray-500 text-sm leading-relaxed max-w-md">
+                        Next-generation AI video generation platform specializing in Sinhala content and cinematic automation. Create professional videos from simple text prompts.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4 text-sm">Product</h4>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li><a href="#" class="hover:text-white transition-colors">Features</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Pricing</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">API</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Enterprise</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4 text-sm">Support</h4>
+                    <ul class="space-y-2 text-sm text-gray-500">
+                        <li><a href="#" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Sinhala Guide</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Contact</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Status</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p class="text-gray-600 text-sm">© 2024 Lakiya AI. All rights reserved.</p>
+                <div class="flex gap-6 text-sm text-gray-600">
+                    <a href="#" class="hover:text-white transition-colors">Privacy</a>
+                    <a href="#" class="hover:text-white transition-colors">Terms</a>
+                    <a href="#" class="hover:text-white transition-colors">Cookies</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Three.js Background Animation
+        const canvas = document.getElementById('bg-canvas');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        
+        // Create particles
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlesCount = 1500;
+        const posArray = new Float32Array(particlesCount * 3);
+        
+        for(let i = 0; i < particlesCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 50;
+        }
+        
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.02,
+            color: 0x6366f1,
+            transparent: true,
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending
+        });
+        
+        const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particlesMesh);
+        
+        camera.position.z = 5;
+        
+        // Mouse interaction
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        document.addEventListener('mousemove', (event) => {
+            mouseX = event.clientX / window.innerWidth - 0.5;
+            mouseY = event.clientY / window.innerHeight - 0.5;
+        });
+        
+        // Animation loop
+        const animate = () => {
+            requestAnimationFrame(animate);
+            
+            particlesMesh.rotation.y += 0.001;
+            particlesMesh.rotation.x += 0.0005;
+            
+            // Subtle mouse follow
+            particlesMesh.rotation.x += mouseY * 0.05;
+            particlesMesh.rotation.y += mouseX * 0.05;
+            
+            renderer.render(scene, camera);
+        };
+        
+        animate();
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Floating particles HTML overlay
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 10 + 's';
+                particle.style.animationDuration = (Math.random() * 10 + 10) + 's';
+                container.appendChild(particle);
+            }
+        }
+        createParticles();
+        
+        // Typing effect for hero
+        const phrases = ['Create Magic with Words', 'Generate Cinematic Stories', 'මැජික් සෑදීම', 'AI-Powered Creation'];
+        let phraseIndex = 0;
+        let charIndex = 0;
+        let isDeleting = false;
+        const heroTitle = document.getElementById('hero-title');
+        
+        function typeEffect() {
+            const currentPhrase = phrases[phraseIndex];
+            
+            if (isDeleting) {
+                heroTitle.textContent = currentPhrase.substring(0, charIndex - 1);
+                charIndex--;
+            } else {
+                heroTitle.textContent = currentPhrase.substring(0, charIndex + 1);
+                charIndex++;
+            }
+            
+            let typeSpeed = isDeleting ? 50 : 100;
+            
+            if (!isDeleting && charIndex === currentPhrase.length) {
+                typeSpeed = 2000;
+                isDeleting = true;
+            } else if (isDeleting && charIndex === 0) {
+                isDeleting = false;
+                phraseIndex = (phraseIndex + 1) % phrases.length;
+                typeSpeed = 500;
+            }
+            
+            setTimeout(typeEffect, typeSpeed);
+        }
+        
+        // Start typing effect
+        setTimeout(typeEffect, 1000);
+        
+        // Language Toggle
+        let currentLang = 'en';
+        function toggleLanguage() {
+            currentLang = currentLang === 'en' ? 'si' : 'en';
+            const indicator = document.getElementById('lang-indicator');
+            const subtitle = document.getElementById('hero-subtitle');
+            const input = document.getElementById('prompt-input');
+            
+            if (currentLang === 'si') {
+                indicator.textContent = '🇱🇰 සිං';
+                subtitle.textContent = 'සරල ප්‍රොම්ප්ට් 10 මිනිත්තු HD සිනමාතමක වීඩියෝ බවට පරිවර්තනය කරන්න. AI බලගතු ස්ක්‍රිප්ට් විස්තාරණය, ස්වයංක්‍රීය දර්ශන උත්පාදනය, සහ ස්වාභාවික සිංහල voiceovers.';
+                input.placeholder = 'ඔබේ වීඩියෝ අදහස විස්තර කරන්න... (උදා: 'පුරාණ ශ්‍රී ලංකානු දේවාල වලින් සුවිසල් සුරඟන චාරිකාව')";
+            } else {
+                indicator.textContent = '🇺🇸 EN';
+                subtitle.textContent = 'Transform simple prompts into 10-minute HD cinematic videos. AI-powered script expansion, automatic scene generation, and natural Sinhala voiceovers.';
+                input.placeholder = "Describe your video idea... (e.g., 'A serene meditation journey through ancient Sri Lankan temples at sunrise')";
+            }
+        }
+        
+        // Clear prompt
+        function clearPrompt() {
+            document.getElementById('prompt-input').value = '';
+            document.getElementById('enhanced-preview').classList.add('hidden');
+        }
+        
+        // Generate Video Function
+        async function generateVideo() {
+            const prompt = document.getElementById('prompt-input').value;
+            if (!prompt.trim()) {
+                alert('Please enter a prompt first');
+                return;
+            }
+            
+            const btn = document.getElementById('generate-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Initializing...</span>';
+            btn.disabled = true;
+            
+            // Show generation section
+            document.getElementById('generation-section').classList.remove('hidden');
+            document.getElementById('video-section').classList.add('hidden');
+            
+            // Scroll to generation section
+            document.getElementById('generation-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Simulate AI Enhancement
+            await simulateEnhancement(prompt);
+            
+            // Simulate generation steps
+            await runGenerationSteps();
+            
+            // Show video player
+            document.getElementById('video-section').classList.remove('hidden');
+            document.getElementById('video-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Reset button
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+        
+        async function simulateEnhancement(prompt) {
+            const badge = document.getElementById('ai-enhance-badge');
+            const preview = document.getElementById('enhanced-preview');
+            const enhancedText = document.getElementById('enhanced-text');
+            
+            badge.classList.remove('hidden');
+            badge.classList.add('flex');
+            
+            // Simulate AI thinking
+            await sleep(1500);
+            
+            // Generate enhanced script based on prompt
+            const enhanced = generateEnhancedScript(prompt);
+            enhancedText.textContent = enhanced;
+            
+            badge.classList.add('hidden');
+            badge.classList.remove('flex');
+            preview.classList.remove('hidden');
+        }
+        
+        function generateEnhancedScript(prompt) {
+            const isSinhala = /[\u0D80-\u0DFF]/.test(prompt);
+            
+            if (isSinhala) {
+                return `[ENHANCED CINEMATIC SCRIPT]\n\nOriginal: "${prompt}"\n\nExpanded: A cinematic journey beginning with aerial drone shots of mist-covered mountains at golden hour (0:00-0:30). Transition to intimate close-ups of traditional hands performing ancient rituals (0:30-1:15). Emotional arc builds with orchestral strings and ambient temple bells. Voiceover in natural Sinhala female tone with reverent emotion. Auto-selected color grading: warm amber tones with teal shadows. Camera movements: slow dolly zooms and gentle tracking shots. Background score adapts to contemplative mood with 432Hz tuning...`;
+            }
+            
+            return `[ENHANCED CINEMATIC SCRIPT]\n\nOriginal: "${prompt}"\n\nExpanded: Opening with cinematic wide establishing shot of ancient temple architecture at 5:30 AM sunrise (0:00-0:45). Slow-motion particles of incense smoke catching golden light rays. Transition to intimate POV walking through stone corridors with ambient reverb (0:45-2:00). AI-selected color palette: warm golds, deep saffron oranges, cool stone grays. Camera angles: low-angle hero shots intercut with intimate macro details. Background score: ambient orchestral with traditional flute melodies. Voiceover: Natural Sinhala female, calm and meditative tone with precise lip-sync...`;
+        }
+        
+        async function runGenerationSteps() {
+            const steps = document.querySelectorAll('.step-item');
+            const progressCircle = document.getElementById('progress-circle');
+            const progressText = document.getElementById('progress-text');
+            const circumference = 264;
+            
+            for (let i = 0; i < steps.length; i++) {
+                const step = steps[i];
+                const status = step.querySelector('.step-status');
+                
+                // Activate step
+                step.classList.remove('opacity-50');
+                step.classList.add('opacity-100', 'bg-white/10', 'border-indigo-500/30');
+                status.classList.remove('bg-gray-600');
+                status.classList.add('bg-indigo-500', 'animate-pulse');
+                
+                // Update progress
+                const progress = ((i + 1) / steps.length) * 100;
+                const offset = circumference - (progress / 100) * circumference;
+                progressCircle.style.strokeDashoffset = offset;
+                progressText.textContent = Math.round(progress) + '%';
+                
+                // If step 2, show scene previews
+                if (i === 1) {
+                    await generateScenePreviews();
+                }
+                
+                await sleep(2000);
+                
+                // Complete step
+                status.classList.remove('bg-indigo-500', 'animate-pulse');
+                status.classList.add('bg-green-500');
+                step.querySelector('.w-8').innerHTML = '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+            }
+            
+            // Final completion
+            progressText.textContent = '100%';
+            await sleep(500);
+        }
+        
+        async function generateScenePreviews() {
+            const container = document.getElementById('scene-preview');
+            container.classList.remove('hidden');
+            
+            const scenes = [
+                { title: 'Scene 1: Establishing', desc: 'Aerial sunrise', color: 'from-orange-400/20 to-purple-500/20' },
+                { title: 'Scene 2: Intimate', desc: 'Close-up rituals', color: 'from-amber-400/20 to-orange-500/20' },
+                { title: 'Scene 3: Transition', desc: 'Corridor walk', color: 'from-blue-400/20 to-indigo-500/20' },
+                { title: 'Scene 4: Climax', desc: 'Temple reveal', color: 'from-purple-400/20 to-pink-500/20' }
+            ];
+            
+            scenes.forEach((scene, index) => {
+                setTimeout(() => {
+                    const div = document.createElement('div');
+                    div.className = 'scene-card glass rounded-lg p-4 border border-white/10';
+                    div.innerHTML = `
+                        <div class="aspect-video rounded-md bg-gradient-to-br ${scene.color} mb-3 flex items-center justify-center">
+                            <span class="text-2xl">🎬</span>
+                        </div>
+                        <h5 class="font-medium text-sm mb-1">${scene.title}</h5>
+                        <p class="text-xs text-gray-500">${scene.desc}</p>
+                        <div class="mt-2 flex items-center gap-1">
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-white/10 text-gray-400">AI Camera</span>
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-white/10 text-gray-400">Auto-cut</span>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                }, index * 300);
+            });
+        }
+        
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // Video Player Functions
+        let isPlaying = false;
+        let progressInterval;
+        
+        function playVideo() {
+            const overlay = document.getElementById('video-overlay');
+            const content = document.getElementById('video-content');
+            const progressBar = document.getElementById('progress-bar');
+            
+            if (!isPlaying) {
+                isPlaying = true;
+                overlay.style.opacity = '1';
+                content.style.opacity = '0';
+                
+                // Simulate progress
+                let progress = 0;
+                progressInterval = setInterval(() => {
+                    progress += 0.5;
+                    progressBar.style.width = progress + '%';
+                    
+                    // Show subtitles at certain points
+                    if (progress > 20 && progress < 80) {
+                        document.getElementById('subtitle-preview').classList.remove('hidden');
+                    } else {
+                        document.getElementById('subtitle-preview').classList.add('hidden');
+                    }
+                    
+                    if (progress >= 100) {
+                        progress = 0;
+                    }
+                }, 100);
+            } else {
+                isPlaying = false;
+                overlay.style.opacity = '0';
+                content.style.opacity = '1';
+                clearInterval(progressInterval);
+            }
+        }
+        
+        function toggleSubtitles() {
+            const btn = document.getElementById('sub-btn');
+            if (btn.textContent === 'ON') {
+                btn.textContent = 'OFF';
+                btn.classList.remove('bg-green-500/20', 'text-green-400', 'border-green-500/30');
+                btn.classList.add('bg-red-500/20', 'text-red-400', 'border-red-500/30');
+            } else {
+                btn.textContent = 'ON';
+                btn.classList.remove('bg-red-500/20', 'text-red-400', 'border-red-500/30');
+                btn.classList.add('bg-green-500/20', 'text-green-400', 'border-green-500/30');
+            }
+        }
+        
+        function exportVideo(format) {
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Exporting...</span>';
+            
+            setTimeout(() => {
+                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><span>Done!</span>';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            }, 2000);
+        }
+        
+        // Auto-detect Sinhala input
+        document.getElementById('prompt-input').addEventListener('input', function(e) {
+            const value = e.target.value;
+            const voiceSelect = document.getElementById('voice-select');
+            
+            if (/[\u0D80-\u0DFF]/.test(value) && voiceSelect.value === 'auto') {
+                voiceSelect.value = 'sinhala-female';
+                // Visual feedback
+                voiceSelect.classList.add('border-cyan-500');
+                setTimeout(() => voiceSelect.classList.remove('border-cyan-500'), 1000);
+            }
+        });
+    </script>
+</body>
+</html>
